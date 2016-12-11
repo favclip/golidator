@@ -147,6 +147,9 @@ func parseTag(tagBody string) (map[string]string, error) {
 	}
 	ss := strings.Split(tagBody, ",")
 	for _, s := range ss {
+		if s == "" {
+			continue
+		}
 		p := strings.SplitN(s, "=", 2)
 		name := p[0]
 		if name == "" {
