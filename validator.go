@@ -1,11 +1,20 @@
 package golidator
 
 import (
-	"errors"
 	"fmt"
 	"reflect"
 	"strings"
 	"unicode"
+)
+
+// ValidationResult provides result of validation.
+type ValidationResult int
+
+const (
+	// ValidationNG means validation is failure.
+	ValidationNG ValidationResult = iota
+	// ValidationOK means validation is succeed.
+	ValidationOK
 )
 
 // Validator is holder of validation information.
@@ -14,30 +23,21 @@ type Validator struct {
 	funcs map[string]ValidationFunc
 }
 
-// Target is information of validation target.
-type Target struct {
-	StructType  reflect.Type
-	StructValue reflect.Value
-	FieldIndex  int
-	FieldInfo   reflect.StructField
-	FieldValue  reflect.Value
-}
-
 // ValidationFunc is validation function itself.
-type ValidationFunc func(t *Target, param string) error
+type ValidationFunc func(param string, value reflect.Value) (ValidationResult, error)
 
 // NewValidator create and setup new Validator.
 func NewValidator() *Validator {
 	v := &Validator{}
 	v.SetTag("validate")
-	v.SetValidationFunc("req", ReqFactory(nil))
-	v.SetValidationFunc("d", DefaultFactory(nil))
-	v.SetValidationFunc("min", MinFactory(nil))
-	v.SetValidationFunc("max", MaxFactory(nil))
-	v.SetValidationFunc("minLen", MinLenFactory(nil))
-	v.SetValidationFunc("maxLen", MaxLenFactory(nil))
-	v.SetValidationFunc("email", EmailFactory(nil))
-	v.SetValidationFunc("enum", EnumFactory(nil))
+	v.SetValidationFunc("req", ReqValidator)
+	v.SetValidationFunc("d", DefaultValidator)
+	v.SetValidationFunc("min", MinValidator)
+	v.SetValidationFunc("max", MaxValidator)
+	v.SetValidationFunc("minLen", MinLenValidator)
+	v.SetValidationFunc("maxLen", MaxLenValidator)
+	v.SetValidationFunc("email", EmailValidator)
+	v.SetValidationFunc("enum", EnumValidator)
 	return v
 }
 
@@ -49,17 +49,49 @@ func (vl *Validator) SetTag(tag string) {
 // SetValidationFunc is setup tag name with ValidationFunc.
 func (vl *Validator) SetValidationFunc(name string, vf ValidationFunc) {
 	if vl.funcs == nil {
-		vl.funcs = make(map[string]ValidationFunc, 0)
+		vl.funcs = make(map[string]ValidationFunc)
 	}
 	vl.funcs[name] = vf
 }
 
-// Validate do validate.
+// Validate argument value.
 func (vl *Validator) Validate(v interface{}) error {
-	return vl.validateStruct(reflect.ValueOf(v))
+	if v == nil {
+		return nil
+	}
+	rv := reflect.ValueOf(v)
+	w := &walker{
+		v: vl,
+		report: &ErrorReport{
+			Root: rv,
+			Type: "https://github.com/favclip/golidator",
+		},
+		ParentFieldName: "",
+		Root:            rv,
+		Current:         rv,
+	}
+	if err := w.walkStruct(); err != nil {
+		return err
+	}
+
+	if len(w.report.Details) != 0 {
+		return w.report
+	}
+
+	return nil
 }
 
-func (vl *Validator) validateStruct(sv reflect.Value) error {
+type walker struct {
+	v      *Validator
+	report *ErrorReport
+
+	ParentFieldName string
+	Root            reflect.Value
+	Current         reflect.Value
+}
+
+func (w *walker) walkStruct() error {
+	sv := w.Current
 	st := sv.Type()
 
 	for sv.Kind() == reflect.Ptr && !sv.IsNil() {
@@ -82,62 +114,125 @@ func (vl *Validator) validateStruct(sv reflect.Value) error {
 			continue
 		}
 
-		tag := ft.Tag.Get(vl.tag)
+		tag := ft.Tag.Get(w.v.tag)
 
 		if tag == "-" {
 			continue
 		}
 		if tag == "" {
 			if fv.Kind() == reflect.Struct {
-				err := vl.validateStruct(fv)
-				if err != nil {
+				if err := w.walkField(ft, fv); err != nil {
 					return err
 				}
 			}
 			continue
 		}
 
-		target := &Target{
-			StructType:  st,
-			StructValue: sv,
-			FieldIndex:  i,
-			FieldInfo:   ft,
-			FieldValue:  fv,
-		}
 		params, err := parseTag(tag)
 		if err != nil {
 			return err
 		}
 
-		err = vl.validateField(target, params)
+		err = w.validateField(ft, fv, params)
 		if err != nil {
-			// TODO custom error handler
 			return err
 		}
 
 		if fv.Kind() == reflect.Struct {
-			err := vl.validateStruct(fv)
-			if err != nil {
-				return err
+			if ft.Anonymous {
+				if err := w.walkFieldWithParentFieldName(w.ParentFieldName, ft, fv); err != nil {
+					return err
+				}
+			} else {
+				if err := w.walkField(ft, fv); err != nil {
+					return err
+				}
 			}
+			continue
 		}
 	}
 
 	return nil
 }
 
-func (vl *Validator) validateField(t *Target, params map[string]string) error {
+func (w *walker) walkFieldWithParentFieldName(parentFieldName string, ft reflect.StructField, fv reflect.Value) error {
+	if fv.Kind() != reflect.Struct {
+		return ErrUnsupportedValue
+	}
+
+	w2 := &walker{
+		v:               w.v,
+		report:          w.report,
+		ParentFieldName: parentFieldName,
+		Root:            w.Root,
+		Current:         fv,
+	}
+	return w2.walkStruct()
+}
+
+func (w *walker) walkField(ft reflect.StructField, fv reflect.Value) error {
+	if fv.Kind() != reflect.Struct {
+		return ErrUnsupportedValue
+	}
+
+	name := w.fieldName(ft)
+	parentFieldName := w.ParentFieldName
+	if parentFieldName != "" {
+		parentFieldName += "."
+	}
+	parentFieldName += name
+
+	return w.walkFieldWithParentFieldName(parentFieldName, ft, fv)
+}
+
+func (w *walker) validateField(ft reflect.StructField, fv reflect.Value, params map[string]string) error {
+	var detail *ErrorDetail
 	for k, v := range params {
-		f, ok := vl.funcs[k]
+		f, ok := w.v.funcs[k]
 		if !ok {
-			return fmt.Errorf("%s: unknown rule %s in %s", t.StructType.Name(), k, t.FieldInfo.Name)
+			return fmt.Errorf("%s: unknown rule %s in %s", w.Current.Type().Name(), k, ft.Name)
 		}
-		err := f(t, v)
+		result, err := f(v, fv)
 		if err != nil {
 			return err
 		}
+		if result == ValidationOK {
+			continue
+		}
+
+		if detail == nil {
+			name := w.fieldName(ft)
+			if parent := w.ParentFieldName; parent != "" {
+				name = parent + "." + name
+			}
+			detail = &ErrorDetail{
+				Current:         w.Current,
+				ParentFieldName: w.ParentFieldName,
+				Value:           fv,
+				Field:           ft,
+				FieldName:       name,
+			}
+		}
+		detail.ReasonList = append(detail.ReasonList, &ErrorReason{
+			Type:   k,
+			Config: v,
+		})
+	}
+	if detail != nil {
+		w.report.Details = append(w.report.Details, detail)
 	}
 	return nil
+}
+
+func (w *walker) fieldName(ft reflect.StructField) string {
+	if tag := ft.Tag.Get("json"); tag != "" {
+		vs := strings.SplitN(tag, ",", 2)
+		if v := vs[0]; v != "" {
+			return v
+		}
+	}
+
+	return ft.Name
 }
 
 func parseTag(tagBody string) (map[string]string, error) {
@@ -153,7 +248,7 @@ func parseTag(tagBody string) (map[string]string, error) {
 		p := strings.SplitN(s, "=", 2)
 		name := p[0]
 		if name == "" {
-			return nil, errors.New("validator - empty name")
+			return nil, ErrEmptyValidationName
 		}
 		if len(p) == 1 {
 			result[name] = ""

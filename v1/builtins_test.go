@@ -8,7 +8,7 @@ func TestBuiltinReqValid(t *testing.T) {
 	v := &Validator{}
 
 	v.SetTag("validate")
-	v.SetValidationFunc("req", ReqValidator)
+	v.SetValidationFunc("req", ReqFactory(nil))
 
 	{ // string
 		err := v.Validate(struct {
@@ -86,7 +86,7 @@ func TestBuiltinReqInvalid(t *testing.T) {
 	v := &Validator{}
 
 	v.SetTag("validate")
-	v.SetValidationFunc("req", ReqValidator)
+	v.SetValidationFunc("req", ReqFactory(nil))
 
 	{ // string
 		err := v.Validate(struct {
@@ -96,9 +96,6 @@ func TestBuiltinReqInvalid(t *testing.T) {
 		})
 		if err == nil {
 			t.Fatalf("error expected")
-		}
-		if _, ok := err.(*ErrorReport); !ok {
-			t.Fatal(err)
 		}
 	}
 	{ // int
@@ -110,9 +107,6 @@ func TestBuiltinReqInvalid(t *testing.T) {
 		if err == nil {
 			t.Fatalf("error expected")
 		}
-		if _, ok := err.(*ErrorReport); !ok {
-			t.Fatal(err)
-		}
 	}
 	{ // float
 		err := v.Validate(struct {
@@ -123,21 +117,15 @@ func TestBuiltinReqInvalid(t *testing.T) {
 		if err == nil {
 			t.Fatalf("error expected")
 		}
-		if _, ok := err.(*ErrorReport); !ok {
-			t.Fatal(err)
-		}
 	}
 	{ // array, slice
 		err := v.Validate(struct {
 			Test []interface{} `validate:"req"`
 		}{
-			Test: []interface{}{},
+			Test: []interface{}{""},
 		})
-		if err == nil {
-			t.Fatalf("error expected")
-		}
-		if _, ok := err.(*ErrorReport); !ok {
-			t.Fatal(err)
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err.Error())
 		}
 	}
 	{ // struct
@@ -149,9 +137,6 @@ func TestBuiltinReqInvalid(t *testing.T) {
 		if err == nil {
 			t.Fatalf("error expected")
 		}
-		if _, ok := err.(*ErrorReport); !ok {
-			t.Fatal(err)
-		}
 	}
 }
 
@@ -159,7 +144,7 @@ func TestBuiltinDefaultRequired(t *testing.T) {
 	v := &Validator{}
 
 	v.SetTag("validate")
-	v.SetValidationFunc("d", DefaultValidator)
+	v.SetValidationFunc("d", DefaultFactory(nil))
 
 	{ // string
 		value := &struct {
@@ -255,7 +240,7 @@ func TestBuiltinDefaultNotRequired(t *testing.T) {
 	v := &Validator{}
 
 	v.SetTag("validate")
-	v.SetValidationFunc("d", DefaultValidator)
+	v.SetValidationFunc("d", DefaultFactory(nil))
 
 	{ // string
 		value := &struct {
@@ -368,7 +353,7 @@ func TestBuiltinMinValid(t *testing.T) {
 	v := &Validator{}
 
 	v.SetTag("validate")
-	v.SetValidationFunc("min", MinValidator)
+	v.SetValidationFunc("min", MinFactory(nil))
 
 	{ // int
 		err := v.Validate(struct {
@@ -424,7 +409,7 @@ func TestBuiltinMinInvalid(t *testing.T) {
 	v := &Validator{}
 
 	v.SetTag("validate")
-	v.SetValidationFunc("min", MinValidator)
+	v.SetValidationFunc("min", MinFactory(nil))
 
 	{ // int
 		err := v.Validate(struct {
@@ -434,9 +419,6 @@ func TestBuiltinMinInvalid(t *testing.T) {
 		})
 		if err == nil {
 			t.Fatalf("error expected")
-		}
-		if _, ok := err.(*ErrorReport); !ok {
-			t.Fatal(err)
 		}
 	}
 	{ // uint
@@ -448,9 +430,6 @@ func TestBuiltinMinInvalid(t *testing.T) {
 		if err == nil {
 			t.Fatalf("error expected")
 		}
-		if _, ok := err.(*ErrorReport); !ok {
-			t.Fatal(err)
-		}
 	}
 	{ // float
 		err := v.Validate(struct {
@@ -461,9 +440,6 @@ func TestBuiltinMinInvalid(t *testing.T) {
 		if err == nil {
 			t.Fatalf("error expected")
 		}
-		if _, ok := err.(*ErrorReport); !ok {
-			t.Fatal(err)
-		}
 	}
 }
 
@@ -471,7 +447,7 @@ func TestBuiltinMaxValid(t *testing.T) {
 	v := &Validator{}
 
 	v.SetTag("validate")
-	v.SetValidationFunc("max", MaxValidator)
+	v.SetValidationFunc("max", MaxFactory(nil))
 
 	{ // int
 		err := v.Validate(struct {
@@ -527,7 +503,7 @@ func TestBuiltinMaxInvalid(t *testing.T) {
 	v := &Validator{}
 
 	v.SetTag("validate")
-	v.SetValidationFunc("max", MaxValidator)
+	v.SetValidationFunc("max", MaxFactory(nil))
 
 	{ // int
 		err := v.Validate(struct {
@@ -537,9 +513,6 @@ func TestBuiltinMaxInvalid(t *testing.T) {
 		})
 		if err == nil {
 			t.Fatalf("error expected")
-		}
-		if _, ok := err.(*ErrorReport); !ok {
-			t.Fatal(err)
 		}
 	}
 	{ // uint
@@ -551,9 +524,6 @@ func TestBuiltinMaxInvalid(t *testing.T) {
 		if err == nil {
 			t.Fatalf("error expected")
 		}
-		if _, ok := err.(*ErrorReport); !ok {
-			t.Fatal(err)
-		}
 	}
 	{ // float
 		err := v.Validate(struct {
@@ -564,9 +534,6 @@ func TestBuiltinMaxInvalid(t *testing.T) {
 		if err == nil {
 			t.Fatalf("error expected")
 		}
-		if _, ok := err.(*ErrorReport); !ok {
-			t.Fatal(err)
-		}
 	}
 }
 
@@ -574,7 +541,7 @@ func TestBuiltinMinLenValid(t *testing.T) {
 	v := &Validator{}
 
 	v.SetTag("validate")
-	v.SetValidationFunc("minLen", MinLenValidator)
+	v.SetValidationFunc("minLen", MinLenFactory(nil))
 
 	{ // string
 		err := v.Validate(struct {
@@ -622,7 +589,7 @@ func TestBuiltinMinLenInvalid(t *testing.T) {
 	v := &Validator{}
 
 	v.SetTag("validate")
-	v.SetValidationFunc("minLen", MinLenValidator)
+	v.SetValidationFunc("minLen", MinLenFactory(nil))
 
 	{ // string
 		err := v.Validate(struct {
@@ -632,9 +599,6 @@ func TestBuiltinMinLenInvalid(t *testing.T) {
 		})
 		if err == nil {
 			t.Fatalf("error expected")
-		}
-		if _, ok := err.(*ErrorReport); !ok {
-			t.Fatal(err)
 		}
 	}
 	{ // array
@@ -646,9 +610,6 @@ func TestBuiltinMinLenInvalid(t *testing.T) {
 		if err == nil {
 			t.Fatalf("error expected")
 		}
-		if _, ok := err.(*ErrorReport); !ok {
-			t.Fatal(err)
-		}
 	}
 	{ // slice
 		err := v.Validate(struct {
@@ -658,9 +619,6 @@ func TestBuiltinMinLenInvalid(t *testing.T) {
 		})
 		if err == nil {
 			t.Fatalf("error expected")
-		}
-		if _, ok := err.(*ErrorReport); !ok {
-			t.Fatal(err)
 		}
 	}
 	{ // map
@@ -672,9 +630,6 @@ func TestBuiltinMinLenInvalid(t *testing.T) {
 		if err == nil {
 			t.Fatalf("error expected")
 		}
-		if _, ok := err.(*ErrorReport); !ok {
-			t.Fatal(err)
-		}
 	}
 }
 
@@ -682,7 +637,7 @@ func TestBuiltinMaxLenValid(t *testing.T) {
 	v := &Validator{}
 
 	v.SetTag("validate")
-	v.SetValidationFunc("maxLen", MaxLenValidator)
+	v.SetValidationFunc("maxLen", MaxLenFactory(nil))
 
 	{ // string
 		err := v.Validate(struct {
@@ -730,7 +685,7 @@ func TestBuiltinMaxLenInvalid(t *testing.T) {
 	v := &Validator{}
 
 	v.SetTag("validate")
-	v.SetValidationFunc("maxLen", MaxLenValidator)
+	v.SetValidationFunc("maxLen", MaxLenFactory(nil))
 
 	{ // string
 		err := v.Validate(struct {
@@ -740,9 +695,6 @@ func TestBuiltinMaxLenInvalid(t *testing.T) {
 		})
 		if err == nil {
 			t.Fatalf("error expected")
-		}
-		if _, ok := err.(*ErrorReport); !ok {
-			t.Fatal(err)
 		}
 	}
 	{ // array
@@ -754,9 +706,6 @@ func TestBuiltinMaxLenInvalid(t *testing.T) {
 		if err == nil {
 			t.Fatalf("error expected")
 		}
-		if _, ok := err.(*ErrorReport); !ok {
-			t.Fatal(err)
-		}
 	}
 	{ // slice
 		err := v.Validate(struct {
@@ -766,9 +715,6 @@ func TestBuiltinMaxLenInvalid(t *testing.T) {
 		})
 		if err == nil {
 			t.Fatalf("error expected")
-		}
-		if _, ok := err.(*ErrorReport); !ok {
-			t.Fatal(err)
 		}
 	}
 	{ // map
@@ -780,9 +726,6 @@ func TestBuiltinMaxLenInvalid(t *testing.T) {
 		if err == nil {
 			t.Fatalf("error expected")
 		}
-		if _, ok := err.(*ErrorReport); !ok {
-			t.Fatal(err)
-		}
 	}
 }
 
@@ -790,7 +733,7 @@ func TestBuiltinEmail(t *testing.T) {
 	v := &Validator{}
 
 	v.SetTag("validate")
-	v.SetValidationFunc("email", EmailValidator)
+	v.SetValidationFunc("email", EmailFactory(nil))
 
 	{
 		list := []struct {
@@ -852,9 +795,6 @@ func TestBuiltinEmail(t *testing.T) {
 			if err == nil {
 				t.Fatalf("error expected")
 			}
-			if _, ok := err.(*ErrorReport); !ok {
-				t.Fatal(err)
-			}
 		}
 	}
 }
@@ -863,7 +803,7 @@ func TestBuiltinEnumValid(t *testing.T) {
 	v := &Validator{}
 
 	v.SetTag("validate")
-	v.SetValidationFunc("enum", EnumValidator)
+	v.SetValidationFunc("enum", EnumFactory(nil))
 
 	{ // string
 		err := v.Validate(struct {
@@ -917,7 +857,7 @@ func TestBuiltinEnumInvalid(t *testing.T) {
 	v := &Validator{}
 
 	v.SetTag("validate")
-	v.SetValidationFunc("enum", EnumValidator)
+	v.SetValidationFunc("enum", EnumFactory(nil))
 
 	{ // string
 		err := v.Validate(struct {
@@ -927,9 +867,6 @@ func TestBuiltinEnumInvalid(t *testing.T) {
 		})
 		if err == nil {
 			t.Fatalf("error expected")
-		}
-		if _, ok := err.(*ErrorReport); !ok {
-			t.Fatal(err)
 		}
 	}
 	{ // int
@@ -941,9 +878,6 @@ func TestBuiltinEnumInvalid(t *testing.T) {
 		if err == nil {
 			t.Fatalf("error expected")
 		}
-		if _, ok := err.(*ErrorReport); !ok {
-			t.Fatal(err)
-		}
 	}
 	{ // uint
 		err := v.Validate(struct {
@@ -953,9 +887,6 @@ func TestBuiltinEnumInvalid(t *testing.T) {
 		})
 		if err == nil {
 			t.Fatalf("error expected")
-		}
-		if _, ok := err.(*ErrorReport); !ok {
-			t.Fatal(err)
 		}
 	}
 }

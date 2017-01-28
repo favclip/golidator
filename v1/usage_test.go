@@ -31,7 +31,7 @@ func ExampleNewValidator() {
 			Value int `validate:"d=10"`
 		}{}
 		v.Validate(obj)
-		fmt.Println("value:", obj.Value)
+		fmt.Println(obj.Value)
 	}
 	{
 		obj := &struct {
@@ -87,39 +87,28 @@ func ExampleNewValidator() {
 		err := v.Validate(obj)
 		fmt.Println(err.Error())
 	}
-	{
-		obj := &struct {
-			Min int `validate:"min=1"`
-			Max int `validate:"max=10"`
-		}{
-			Min: 0,
-			Max: 11,
-		}
-		err := v.Validate(obj)
-		fmt.Println(err.Error())
-	}
 
 	// Output:
-	// invalid. #1 Value: req actual: ''
-	// value: 10
-	// invalid. #1 Value: min=10 actual: 0
-	// invalid. #1 Value: max=10 actual: 100
-	// invalid. #1 Value: minLen=3 actual: 'ab'
-	// invalid. #1 Value: maxLen=3 actual: 'abcd'
-	// invalid. #1 Value: email actual: 'foo@bar@buzz'
-	// invalid. #1 Value: enum=A|B actual: 'C'
-	// invalid. #1 Min: min=1 actual: 0, #2 Max: max=10 actual: 11
+	// Value: required, actual ``
+	// 10
+	// Value: 0 less than 10
+	// Value: 100 greater than 10
+	// Value: less than 3: `ab`
+	// Value: greater than 3: `abcd`
+	// Value: unsupported email format foo@bar@buzz
+	// Value: `C` is not member of [A, B]
 }
 
 func ExampleValidator_SetValidationFunc() {
 	v := &Validator{}
 	v.SetTag("validate")
-	v.SetValidationFunc("req", func(param string, val reflect.Value) (ValidationResult, error) {
+	v.SetValidationFunc("req", func(t *Target, param string) error {
+		val := t.FieldValue
 		if str := val.String(); str == "" {
-			return ValidationNG, nil
+			return fmt.Errorf("unexpected value: '%s'", str)
 		}
 
-		return ValidationOK, nil
+		return nil
 	})
 
 	obj := &struct {
@@ -129,19 +118,24 @@ func ExampleValidator_SetValidationFunc() {
 	fmt.Println(err.Error())
 
 	// Output:
-	// invalid. #1 Value: req actual: ''
+	// unexpected value: ''
 }
 
-type Example struct {
-	String string `validate:"req"`
-}
+func ExampleValidator_useCustomizedError() {
+	v := &Validator{}
+	v.SetTag("validate")
+	v.SetValidationFunc("req", ReqFactory(&ReqErrorOption{
+		ReqError: func(f reflect.StructField, actual interface{}) error {
+			return fmt.Errorf("%s IS REQUIRED", f.Name)
+		},
+	}))
 
-func ExampleValidator_Validate() {
-	v := NewValidator()
-
-	err := v.Validate(&Example{})
+	obj := &struct {
+		FooBar string `validate:"req"`
+	}{}
+	err := v.Validate(obj)
 	fmt.Println(err.Error())
 
 	// Output:
-	// invalid. Example #1 String: req actual: ''
+	// FooBar IS REQUIRED
 }

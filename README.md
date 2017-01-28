@@ -24,24 +24,11 @@ err := v.Validate(obj)
 
 ```
 v := golidator.NewValidator()
-v.SetValidationFunc("req", func(t *validator.Target, param string) error {
-    val := t.FieldValue
+v.SetValidationFunc("req", func(param string, val reflect.Value) (golidator.ValidationResult, error) {
     if str := val.String(); str == "" {
-        return fmt.Errorf("unexpected value: %s", str)
+        return golidator.ValidationNG, nil
     }
 
-    return nil
+    return golidator.ValidationOK, nil
 })
-```
-
-### Use Customized Error
-
-```
-v := &golidator.Validator{}
-v.SetTag("validate")
-v.SetValidationFunc("req", validator.ReqFactory(&validator.ReqErrorOption{
-    ReqError: func(f reflect.StructField, actual interface{}) error {
-        return fmt.Errorf("%s IS REQUIRED", f.Name)
-    },
-}))
 ```

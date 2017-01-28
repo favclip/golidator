@@ -3,4 +3,4 @@
 goimports -w .
 go tool vet .
 golint ./...
-go test .
+go test ./... $@
