@@ -1,68 +1,80 @@
 package golidator
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"reflect"
-	"strings"
 )
 
-var (
-	// ErrUnsupportedValue is error of unsupported value type
-	ErrUnsupportedValue = errors.New("unsupported value")
-)
+// ErrEmptyValidationName means invalid validator name error.
+var ErrEmptyValidationName = errors.New("validator name is required")
 
-// UnsupportedTypeError returns an error from unsupported type.
-func UnsupportedTypeError(in string, f reflect.StructField) error {
-	return fmt.Errorf("%s: [%s] unsupported type %s", f.Name, in, f.Type.Name())
+// ErrUnsupportedValue means golidator is not support type of passed value.
+var ErrUnsupportedValue = errors.New("unsupported type")
+
+// ErrValidateUnsupportedType means validator is not support field type.
+var ErrValidateUnsupportedType = errors.New("unsupported field type")
+
+// ErrInvalidConfigValue means config value can't accept by validator.
+var ErrInvalidConfigValue = errors.New("invalid configuration value")
+
+// ErrorReport provides detail of error informations.
+type ErrorReport struct {
+	Root reflect.Value `json:"-"`
+
+	Type    string         `json:"type"` // fixed value. https://github.com/favclip/golidator
+	Details []*ErrorDetail `json:"details"`
 }
 
-// EmptyParamError returns an error from empty param.
-func EmptyParamError(in string, f reflect.StructField) error {
-	return fmt.Errorf("%s: %s value is required", f.Name, in)
+// ErrorDetail provides error about 1 field.
+type ErrorDetail struct {
+	ParentFieldName string              `json:"-"`
+	Current         reflect.Value       `json:"-"`
+	Value           reflect.Value       `json:"-"`
+	Field           reflect.StructField `json:"-"`
+
+	FieldName  string         `json:"fieldName"` // e.g. address , person.name
+	ReasonList []*ErrorReason `json:"reasonList"`
 }
 
-// ParamParseError returns an error from parsing param.
-func ParamParseError(in string, f reflect.StructField, expected string) error {
-	return fmt.Errorf("%s: %s value must be %s", f.Name, in, expected)
+// ErrorReason contains why validation is failed?
+type ErrorReason struct {
+	Type   string `json:"type"`             // e.g. req , min, enum
+	Config string `json:"config,omitempty"` // e.g. 1, manual|auto, ^[^@]+@gmail.com$
 }
 
-// ReqError returns an error from "req" validator.
-func ReqError(f reflect.StructField, actual interface{}) error {
-	return fmt.Errorf("%s: required, actual `%v`", f.Name, actual)
-}
+func (report *ErrorReport) Error() string {
+	buf := bytes.NewBufferString("invalid. ")
 
-// DefaultError returns an error from "d" validator.
-func DefaultError(f reflect.StructField) error {
-	return fmt.Errorf("%s is not pointer. can't set default value", f.Name)
-}
+	for t := report.Root.Type(); ; {
+		switch t.Kind() {
+		case reflect.Array, reflect.Chan, reflect.Map, reflect.Ptr, reflect.Slice:
+			t = t.Elem()
+			continue
+		}
+		if name := t.Name(); name != "" {
+			fmt.Fprint(buf, name, " ")
+		}
+		break
+	}
+	for idx, detail := range report.Details {
+		fmt.Fprint(buf, "#", idx+1, " ", detail.FieldName, ": ")
+		for _, report := range detail.ReasonList {
+			fmt.Fprint(buf, report.Type)
+			if report.Config != "" {
+				fmt.Fprint(buf, "=", report.Config)
+			}
+			if detail.Value.Kind() == reflect.String {
+				fmt.Fprintf(buf, " actual: '%v'", detail.Value.Interface())
+			} else {
+				fmt.Fprintf(buf, " actual: %v", detail.Value.Interface())
+			}
+		}
+		if idx != len(report.Details)-1 {
+			fmt.Fprint(buf, ", ")
+		}
+	}
 
-// MinError returns an error from "min" validator.
-func MinError(f reflect.StructField, actual, min interface{}) error {
-	return fmt.Errorf("%s: %v less than %v", f.Name, actual, min)
-}
-
-// MaxError returns an error from "max" validator.
-func MaxError(f reflect.StructField, actual, max interface{}) error {
-	return fmt.Errorf("%s: %v greater than %v", f.Name, actual, max)
-}
-
-// MinLenError returns an error from "minLen" validator.
-func MinLenError(f reflect.StructField, actual, min interface{}) error {
-	return fmt.Errorf("%s: less than %v: `%v`", f.Name, min, actual)
-}
-
-// MaxLenError returns an error from "maxLen" validator.
-func MaxLenError(f reflect.StructField, actual, max interface{}) error {
-	return fmt.Errorf("%s: greater than %v: `%v`", f.Name, max, actual)
-}
-
-// EmailError returns an error from "email" validator.
-func EmailError(f reflect.StructField, actual string) error {
-	return fmt.Errorf("%s: unsupported email format %s", f.Name, actual)
-}
-
-// EnumError returns an error from "enum" validator.
-func EnumError(f reflect.StructField, actual interface{}, enum []string) error {
-	return fmt.Errorf("%s: `%v` is not member of [%v]", f.Name, actual, strings.Join(enum, ", "))
+	return buf.String()
 }

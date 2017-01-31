@@ -1,105 +1,44 @@
 package golidator
 
 import (
-	"errors"
-	"reflect"
+	"encoding/json"
 	"testing"
 )
 
-type Request struct {
-	Restrict
-	Title string `validate:"d=unknown"`
+type Target struct {
+	Name string `validate:"req,minLen=2"`
+	Age  int    `json:"age" validate:"req,min=0"`
+	Like string `json:"like" validate:"maxLen=10"`
+
+	TargetSub `validate:"req"`
+	Sub       *TargetSub `validate:"req"`
 }
 
-type Restrict struct {
-	Limit   int `validate:"d=10"`
-	Curstor string
+type TargetSub struct {
+	Address string `validate:"req"`
 }
 
 func TestUsage(t *testing.T) {
-	v := NewValidator()
-
-	{
-		err := v.Validate(struct {
-			Test string `validate:"req,enum=ok|ng"`
-		}{
-			Test: "unknown",
-		})
-		if err == nil {
-			t.Fatalf("error expected")
-		}
-		t.Logf(err.Error())
-	}
-	{
-		err := v.Validate(struct {
-			Test string `validate:"req,enum=ok|ng"`
-		}{
-			Test: "",
-		})
-		if err == nil {
-			t.Fatalf("error expected")
-		}
-		t.Logf(err.Error())
-	}
-	{
-		err := v.Validate(struct {
-			Test string `validate:"req,maxLen=3"`
-		}{
-			Test: "1234",
-		})
-		if err == nil {
-			t.Fatalf("error expected")
-		}
-		t.Logf(err.Error())
-	}
-	{
-		err := v.Validate(struct {
-			Test string `validate:"req,minLen=2,maxLen=3"`
-		}{
-			Test: "1",
-		})
-		if err == nil {
-			t.Fatalf("error expected")
-		}
-		t.Logf(err.Error())
-	}
-}
-
-func TestEmbedStruct(t *testing.T) {
-	v := NewValidator()
-	value := &Request{
-		Restrict: Restrict{},
-	}
-	err := v.Validate(value)
-	if err != nil {
-		t.Fatalf("unexpected error: %s", err.Error())
-	}
-}
-
-func TestUseCustomError(t *testing.T) {
-	type Test struct {
-		A string `validate:"req" customError:"Test.A"`
-		B string `validate:"req"`
-	}
 	v := &Validator{}
-	v.SetTag("validate")
-	v.SetValidationFunc("req", ReqFactory(&ReqErrorOption{
-		ReqError: func(f reflect.StructField, actual interface{}) error {
-			if f.Tag.Get("customError") == "Test.A" {
-				return errors.New("Test.A")
-			}
-			return errors.New(f.Name)
-		},
-	}))
+	v.tag = "validate"
+	v.funcs = make(map[string]ValidationFunc)
+	v.funcs["req"] = ReqValidator
+	v.funcs["minLen"] = MinLenValidator
+	v.funcs["maxLen"] = MaxLenValidator
+	v.funcs["min"] = MinValidator
 
-	err := v.Validate(&Test{
-		A: "",
-		B: "1111",
+	err := v.Validate(&Target{
+		Name: "foobar",
+		Sub:  &TargetSub{},
 	})
-	if err == nil {
-		t.Fatalf("unexpected")
+	report, ok := err.(*ErrorReport)
+	if err != nil && !ok {
+		t.Fatal(err)
 	}
-	if err.Error() != "Test.A" {
-		t.Fatalf("unexpected: %s", err.Error())
+
+	b, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		t.Fatal(err)
 	}
+	t.Log(string(b))
 }
