@@ -227,7 +227,7 @@ func (w *walker) validateField(ft reflect.StructField, fv reflect.Value, params 
 func (w *walker) fieldName(ft reflect.StructField) string {
 	if tag := ft.Tag.Get("json"); tag != "" {
 		vs := strings.SplitN(tag, ",", 2)
-		if v := vs[0]; v != "" {
+		if v := vs[0]; v != "" && v != "-" {
 			return v
 		}
 	}
