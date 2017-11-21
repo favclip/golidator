@@ -38,7 +38,7 @@ func ReqValidator(param string, v reflect.Value) (ValidationResult, error) {
 		}
 	case reflect.Struct:
 		// :)
-	case reflect.Ptr:
+	case reflect.Ptr, reflect.Interface:
 		if v.IsNil() {
 			return ValidationNG, nil
 		}
