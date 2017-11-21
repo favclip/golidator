@@ -27,5 +27,6 @@ jobs:
 
       - checkout
 
-      - run: go get ./...
+      - run: go get -u golang.org/x/tools/cmd/goimports
+      - run: go get -u github.com/golang/lint/golint
       - run: ./test.sh
