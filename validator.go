@@ -38,6 +38,7 @@ func NewValidator() *Validator {
 	v.SetValidationFunc("maxLen", MaxLenValidator)
 	v.SetValidationFunc("email", EmailValidator)
 	v.SetValidationFunc("enum", EnumValidator)
+	v.SetValidationFunc("regexp", RegExpValidator)
 	return v
 }
 

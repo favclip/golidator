@@ -369,3 +369,28 @@ func EnumValidator(param string, v reflect.Value) (ValidationResult, error) {
 
 	return enum(v)
 }
+
+// RegExpValidator check value that must valid about config regexp pattern.
+func RegExpValidator(param string, v reflect.Value) (ValidationResult, error) {
+	if param == "" {
+		return ValidationNG, ErrInvalidConfigValue
+	}
+
+	re, err := regexp.Compile(param)
+	if err != nil {
+		return ValidationNG, ErrInvalidConfigValue
+	}
+
+	switch v.Kind() {
+	case reflect.String:
+		if v.String() == "" {
+			return ValidationOK, nil // empty is valid. if you want to check it, use req validator.
+		} else if !re.MatchString(v.String()) {
+			return ValidationNG, nil
+		}
+	default:
+		return ValidationNG, ErrValidateUnsupportedType
+	}
+
+	return ValidationOK, nil
+}

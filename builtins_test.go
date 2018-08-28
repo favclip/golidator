@@ -959,3 +959,46 @@ func TestBuiltinEnumInvalid(t *testing.T) {
 		}
 	}
 }
+
+func TestBuiltinRegExpValid(t *testing.T) {
+	v := &Validator{}
+
+	v.SetTag("validate")
+	v.SetValidationFunc("regexp", RegExpValidator)
+
+	{ // string
+		err := v.Validate(struct {
+			TestA string `validate:"regexp=foobar"`
+			TestB string `validate:"regexp=[a-c]{3}"`
+			TestC string `validate:"regexp=^a$"`
+		}{
+			TestA: "This is foobar!",
+			TestB: "abc",
+			TestC: "", // empty is valid
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err.Error())
+		}
+	}
+}
+
+func TestBuiltinRegExpInvalid(t *testing.T) {
+	v := &Validator{}
+
+	v.SetTag("validate")
+	v.SetValidationFunc("regexp", RegExpValidator)
+
+	{ // string
+		err := v.Validate(struct {
+			Test string `validate:"regexp=[a-c]"`
+		}{
+			Test: "z",
+		})
+		if err == nil {
+			t.Fatalf("error expected")
+		}
+		if _, ok := err.(*ErrorReport); !ok {
+			t.Fatal(err)
+		}
+	}
+}
