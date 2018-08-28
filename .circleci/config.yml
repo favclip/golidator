@@ -3,15 +3,15 @@ jobs:
   build:
     working_directory: /go/src/github.com/favclip/golidator
     docker:
-      - image: google/cloud-sdk:178.0.0
+      - image: google/cloud-sdk:213.0.0-alpine
         environment:
           GOPATH: /go
-          GOLANG_VERSION: 1.9.2
+          GOLANG_VERSION: 1.11
     steps:
       - run:
           name: PATH update
           command: |
-            echo "export PATH=\$PATH:/go/bin:/usr/local/go/bin:/usr/lib/google-cloud-sdk/platform/google_appengine" >> $BASH_ENV
+            echo "export PATH=\$PATH:/go/bin:/usr/local/go/bin:/google-cloud-sdk/platform/google_appengine" >> $BASH_ENV
             cat $BASH_ENV
       - run:
           name: install go binary
@@ -22,8 +22,13 @@ jobs:
             mv go /usr/local && \
             rm go.tar.gz
       - run:
-          name: apply monkey patch
-          command: chmod +x /usr/lib/google-cloud-sdk/platform/google_appengine/goapp
+          name: install tools for cgo build
+          command: apk add alpine-sdk # for cgo
+      - run:
+          name: setup AppEngine/Go
+          command: |
+            gcloud components --quiet install app-engine-go
+            chmod +x /google-cloud-sdk/platform/google_appengine/goapp
 
       - checkout
 
