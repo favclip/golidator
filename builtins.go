@@ -313,8 +313,8 @@ func EnumValidator(param string, v reflect.Value) (ValidationResult, error) {
 
 	params := strings.Split(param, "|")
 
-	var enum func(v reflect.Value) (ValidationResult, error)
-	enum = func(v reflect.Value) (ValidationResult, error) {
+	var check func(v reflect.Value) (ValidationResult, error)
+	check = func(v reflect.Value) (ValidationResult, error) {
 		if v.Kind() == reflect.Ptr {
 			v = v.Elem()
 		}
@@ -358,16 +358,22 @@ func EnumValidator(param string, v reflect.Value) (ValidationResult, error) {
 		case reflect.Array, reflect.Slice:
 			for i := 0; i < v.Len(); i++ {
 				e := v.Index(i)
-				return enum(e)
+				result, err := check(e)
+				if err != nil {
+					return 0, err
+				}
+				if result != ValidationOK {
+					return ValidationNG, nil
+				}
 			}
+			return ValidationOK, nil
+
 		default:
 			return 0, ErrValidateUnsupportedType
 		}
-
-		return ValidationOK, nil
 	}
 
-	return enum(v)
+	return check(v)
 }
 
 // RegExpValidator check value that must valid about config regexp pattern.
